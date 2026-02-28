@@ -23,6 +23,7 @@ import { ILabelService } from '../../../../../../platform/label/common/label.js'
 import { IStorageService, StorageScope, StorageTarget } from '../../../../../../platform/storage/common/storage.js';
 import { ICommandDetectionCapability, TerminalCapability } from '../../../../../../platform/terminal/common/capabilities/capabilities.js';
 import { ITerminalLogService, ITerminalProfile } from '../../../../../../platform/terminal/common/terminal.js';
+import { getRemoteName } from '../../../../../../platform/remote/common/remoteHosts.js';
 import { IRemoteAgentService } from '../../../../../services/remote/common/remoteAgentService.js';
 import { TerminalToolConfirmationStorageKeys } from '../../../../chat/browser/widget/chatContentParts/toolInvocationParts/chatTerminalToolConfirmationSubPart.js';
 import { IChatService, type IChatTerminalToolInvocationData } from '../../../../chat/common/chatService/chatService.js';
@@ -191,11 +192,29 @@ function createFishModelDescription(): string {
 	].join('\n');
 }
 
+/**
+ * Returns additional model description lines when the terminal session is running
+ * on a remote host connected via SSH. This prevents the model from spawning redundant
+ * `ssh user@host 'command'` subconnections when it should run commands directly in
+ * the already-connected session.
+ */
+function createSshSessionGuidance(): string {
+	return [
+		'',
+		'SSH Session:',
+		'- You are connected to a remote host via SSH — run commands directly in this session, never spawn new ssh subconnections',
+		'- Use the existing terminal session for sequential commands rather than ssh user@host \'command\'',
+		'- Do not use ssh, scp, or sftp to connect back to this same host — you are already here',
+		'- Session state (environment variables, working directory, background jobs) persists between commands',
+	].join('\n');
+}
+
 export async function createRunInTerminalToolData(
 	accessor: ServicesAccessor
 ): Promise<IToolData> {
 	const instantiationService = accessor.get(IInstantiationService);
 
+	const remoteAgentService = accessor.get(IRemoteAgentService);
 	const profileFetcher = instantiationService.createInstance(TerminalProfileFetcher);
 	const shell = await profileFetcher.getCopilotShell();
 	const os = await profileFetcher.osBackend;
@@ -209,6 +228,14 @@ export async function createRunInTerminalToolData(
 		modelDescription = createFishModelDescription();
 	} else {
 		modelDescription = createBashModelDescription();
+	}
+
+	// Append SSH session guidance when connected to a remote host via SSH.
+	// This prevents the model from generating redundant ssh subconnections
+	// (e.g., `ssh user@host 'command'`) when it should use the existing session.
+	const remoteAuthority = remoteAgentService.getConnection()?.remoteAuthority;
+	if (remoteAuthority && getRemoteName(remoteAuthority) === 'ssh-remote') {
+		modelDescription += createSshSessionGuidance();
 	}
 
 	return {

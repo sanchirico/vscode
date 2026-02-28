@@ -6,7 +6,7 @@
 import { ok, strictEqual } from 'assert';
 import { Separator } from '../../../../../../base/common/actions.js';
 import { CancellationToken } from '../../../../../../base/common/cancellation.js';
-import { Emitter } from '../../../../../../base/common/event.js';
+import { Emitter, Event } from '../../../../../../base/common/event.js';
 import { Schemas } from '../../../../../../base/common/network.js';
 import { isLinux, isWindows, OperatingSystem } from '../../../../../../base/common/platform.js';
 import { count } from '../../../../../../base/common/strings.js';
@@ -25,6 +25,7 @@ import { ITerminalProfile } from '../../../../../../platform/terminal/common/ter
 import { IWorkspaceContextService, toWorkspaceFolder } from '../../../../../../platform/workspace/common/workspace.js';
 import { Workspace } from '../../../../../../platform/workspace/test/common/testWorkspace.js';
 import { IHistoryService } from '../../../../../services/history/common/history.js';
+import { IRemoteAgentService, type IRemoteAgentConnection } from '../../../../../services/remote/common/remoteAgentService.js';
 import { TreeSitterLibraryService } from '../../../../../services/treeSitter/browser/treeSitterLibraryService.js';
 import { workbenchInstantiationService } from '../../../../../test/browser/workbenchTestServices.js';
 import { TestContextService } from '../../../../../test/common/workbenchTestServices.js';
@@ -36,7 +37,7 @@ import { ITerminalSandboxService } from '../../common/terminalSandboxService.js'
 import { ILanguageModelToolsService, IPreparedToolInvocation, IToolInvocationPreparationContext, type ToolConfirmationAction } from '../../../../chat/common/tools/languageModelToolsService.js';
 import { ITerminalChatService, ITerminalService, type ITerminalInstance } from '../../../../terminal/browser/terminal.js';
 import { ITerminalProfileResolverService } from '../../../../terminal/common/terminal.js';
-import { RunInTerminalTool, type IRunInTerminalInputParams } from '../../browser/tools/runInTerminalTool.js';
+import { RunInTerminalTool, createRunInTerminalToolData, type IRunInTerminalInputParams } from '../../browser/tools/runInTerminalTool.js';
 import { ShellIntegrationQuality } from '../../browser/toolTerminalCreator.js';
 import { terminalChatAgentToolsConfiguration, TerminalChatAgentToolsSettingId } from '../../common/terminalChatAgentToolsConfiguration.js';
 import { TerminalChatService } from '../../../chat/browser/terminalChatService.js';
@@ -1424,5 +1425,69 @@ suite('RunInTerminalTool', () => {
 				ok(!disclaimerValue.includes('denied'), 'Should not mention denial for non-denied commands');
 			}
 		});
+	});
+});
+
+suite('createRunInTerminalToolData - SSH awareness', () => {
+	const store = ensureNoDisposablesAreLeakedInTestSuite();
+
+	let instantiationService: TestInstantiationService;
+	let configurationService: TestConfigurationService;
+
+	setup(() => {
+		configurationService = new TestConfigurationService();
+
+		const logService = new NullLogService();
+		const fileService = store.add(new FileService(logService));
+		const fileSystemProvider = new TestIPCFileSystemProvider();
+		store.add(fileService.registerProvider(Schemas.file, fileSystemProvider));
+
+		instantiationService = workbenchInstantiationService({
+			configurationService: () => configurationService,
+			fileService: () => fileService,
+		}, store);
+
+		instantiationService.stub(ITerminalProfileResolverService, {
+			getDefaultProfile: async () => ({ path: '/bin/bash' } as ITerminalProfile)
+		});
+	});
+
+	test('should append SSH session guidance when connected via ssh-remote', async () => {
+		instantiationService.stub(IRemoteAgentService, {
+			getConnection: () => ({
+				remoteAuthority: 'ssh-remote+myserver',
+				onReconnecting: Event.None,
+				onDidStateChange: Event.None,
+			} as Partial<IRemoteAgentConnection> as IRemoteAgentConnection),
+			getEnvironment: async () => null,
+		});
+
+		const toolData = await instantiationService.invokeFunction(createRunInTerminalToolData);
+
+		ok(toolData.modelDescription.includes('SSH Session:'), 'Expected model description to contain SSH Session section');
+		ok(toolData.modelDescription.includes('never spawn new ssh subconnections'), 'Expected SSH guidance about not spawning subconnections');
+		ok(toolData.modelDescription.includes('Session state'), 'Expected SSH guidance about session state persistence');
+	});
+
+	test('should not append SSH guidance when not connected remotely', async () => {
+		// Default TestRemoteAgentService returns null for getConnection()
+		const toolData = await instantiationService.invokeFunction(createRunInTerminalToolData);
+
+		ok(!toolData.modelDescription.includes('SSH Session:'), 'Expected no SSH Session section when not remote');
+	});
+
+	test('should not append SSH guidance for non-SSH remotes (e.g., tunnels)', async () => {
+		instantiationService.stub(IRemoteAgentService, {
+			getConnection: () => ({
+				remoteAuthority: 'tunnel+mytunnel',
+				onReconnecting: Event.None,
+				onDidStateChange: Event.None,
+			} as Partial<IRemoteAgentConnection> as IRemoteAgentConnection),
+			getEnvironment: async () => null,
+		});
+
+		const toolData = await instantiationService.invokeFunction(createRunInTerminalToolData);
+
+		ok(!toolData.modelDescription.includes('SSH Session:'), 'Expected no SSH Session section for tunnel remote');
 	});
 });
