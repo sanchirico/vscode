@@ -36,7 +36,7 @@ import type { ITerminalExecuteStrategy, ITerminalExecuteStrategyResult } from '.
 import { NoneExecuteStrategy } from '../executeStrategy/noneExecuteStrategy.js';
 import { RichExecuteStrategy } from '../executeStrategy/richExecuteStrategy.js';
 import { getOutput } from '../outputHelpers.js';
-import { extractCdPrefix, isFish, isPowerShell, isWindowsPowerShell, isZsh } from '../runInTerminalHelpers.js';
+import { extractCdPrefix, isFish, isKsh, isPowerShell, isWindowsPowerShell, isZsh } from '../runInTerminalHelpers.js';
 import type { ICommandLinePresenter } from './commandLinePresenter/commandLinePresenter.js';
 import { NodeCommandLinePresenter } from './commandLinePresenter/nodeCommandLinePresenter.js';
 import { PythonCommandLinePresenter } from './commandLinePresenter/pythonCommandLinePresenter.js';
@@ -191,6 +191,17 @@ function createFishModelDescription(): string {
 	].join('\n');
 }
 
+function createKshModelDescription(): string {
+	return [
+		'This tool allows you to execute shell commands in a persistent ksh terminal session, preserving environment variables, working directory, and other context across multiple commands.',
+		genericDescription,
+		'- Use [[ ]] for conditional tests instead of [ ]',
+		'- Prefer $() over backticks for command substitution',
+		'- Use set -e at start of complex commands to exit on errors',
+		'- Use typeset to declare typed variables'
+	].join('\n');
+}
+
 export async function createRunInTerminalToolData(
 	accessor: ServicesAccessor
 ): Promise<IToolData> {
@@ -207,6 +218,8 @@ export async function createRunInTerminalToolData(
 		modelDescription = createZshModelDescription();
 	} else if (shell && os && isFish(shell, os)) {
 		modelDescription = createFishModelDescription();
+	} else if (shell && os && isKsh(shell, os)) {
+		modelDescription = createKshModelDescription();
 	} else {
 		modelDescription = createBashModelDescription();
 	}

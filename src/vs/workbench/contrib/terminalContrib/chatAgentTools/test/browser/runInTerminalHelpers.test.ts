@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { ok, strictEqual } from 'assert';
-import { generateAutoApproveActions, TRUNCATION_MESSAGE, dedupeRules, isPowerShell, sanitizeTerminalOutput, truncateOutputKeepingTail, extractCdPrefix } from '../../browser/runInTerminalHelpers.js';
+import { generateAutoApproveActions, TRUNCATION_MESSAGE, dedupeRules, isKsh, isPowerShell, sanitizeTerminalOutput, truncateOutputKeepingTail, extractCdPrefix } from '../../browser/runInTerminalHelpers.js';
 import { OperatingSystem } from '../../../../../../base/common/platform.js';
 import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../../base/test/common/utils.js';
 import { ConfigurationTarget } from '../../../../../../platform/configuration/common/configuration.js';
@@ -504,4 +504,32 @@ suite('extractCdPrefix', () => {
 	});
 });
 
+suite('isKsh', () => {
+	ensureNoDisposablesAreLeakedInTestSuite();
 
+	test('should detect ksh variants', () => {
+		ok(isKsh('/usr/bin/ksh', OperatingSystem.Linux));
+		ok(isKsh('/usr/bin/ksh88', OperatingSystem.Linux));
+		ok(isKsh('/usr/bin/ksh93', OperatingSystem.Linux));
+		ok(isKsh('/usr/bin/mksh', OperatingSystem.Linux));
+		ok(isKsh('/usr/bin/pdksh', OperatingSystem.Linux));
+		ok(isKsh('/usr/bin/oksh', OperatingSystem.Linux));
+		ok(isKsh('ksh.exe', OperatingSystem.Windows));
+		ok(isKsh('mksh.exe', OperatingSystem.Windows));
+		ok(isKsh('pdksh.exe', OperatingSystem.Windows));
+		ok(isKsh('oksh.exe', OperatingSystem.Windows));
+		ok(isKsh('KSH.EXE', OperatingSystem.Windows));
+	});
+
+	test('should not detect unrelated shells', () => {
+		ok(!isKsh('/bin/bash', OperatingSystem.Linux));
+		ok(!isKsh('/bin/zsh', OperatingSystem.Linux));
+		ok(!isKsh('/bin/sh', OperatingSystem.Linux));
+		ok(!isKsh('cmd.exe', OperatingSystem.Windows));
+	});
+
+	test('should not match partial names', () => {
+		ok(!isKsh('/usr/bin/tksh', OperatingSystem.Linux));
+		ok(!isKsh('/usr/bin/kshell', OperatingSystem.Linux));
+	});
+});

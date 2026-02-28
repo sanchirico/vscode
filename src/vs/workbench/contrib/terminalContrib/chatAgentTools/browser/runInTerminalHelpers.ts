@@ -47,6 +47,20 @@ export function isFish(envShell: string, os: OperatingSystem): boolean {
 	return /^fish$/.test(pathPosix.basename(envShell));
 }
 
+export function isKsh(envShell: string, os: OperatingSystem): boolean {
+	// ksh     - AT&T ksh on AIX and Linux (SHELL=/usr/bin/ksh)
+	// ksh93   - AT&T ksh93 explicit binary on AIX (ksh93 package) and Linux
+	// ksh88   - Older AT&T ksh88 explicit binary
+	// mksh    - MirBSD Korn Shell, common on Debian/Ubuntu/Alpine/Android
+	// pdksh   - Public Domain Korn Shell, historically default on FreeBSD/OpenBSD
+	// oksh    - Portable OpenBSD ksh, installable as 'oksh' on Linux
+	// (dtksh is always symlinked/packaged as plain 'ksh' on CDE platforms)
+	if (os === OperatingSystem.Windows) {
+		return /^(?:ksh\d*|mksh|pdksh|oksh)(?:\.exe)?$/i.test(pathWin32.basename(envShell));
+	}
+	return /^(?:ksh\d*|mksh|pdksh|oksh)$/.test(pathPosix.basename(envShell));
+}
+
 // Maximum output length to prevent context overflow
 const MAX_OUTPUT_LENGTH = 60000; // ~60KB limit to keep context manageable
 export const TRUNCATION_MESSAGE = '\n\n[... PREVIOUS OUTPUT TRUNCATED ...]\n\n';
@@ -96,7 +110,7 @@ export function generateAutoApproveActions(commandLine: string, subCommands: str
 		// however as it's very specific.
 		const neverAutoApproveCommands = new Set([
 			// Shell interpreters
-			'bash', 'sh', 'zsh', 'fish', 'ksh', 'csh', 'tcsh', 'dash',
+			'bash', 'sh', 'zsh', 'fish', 'ksh', 'ksh88', 'ksh93', 'mksh', 'pdksh', 'oksh', 'csh', 'tcsh', 'dash',
 			'pwsh', 'powershell', 'powershell.exe', 'cmd', 'cmd.exe',
 			// Script interpreters
 			'python', 'python3', 'node', 'ruby', 'perl', 'php', 'lua',
