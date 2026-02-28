@@ -104,6 +104,8 @@ export function generateAutoApproveActions(commandLine: string, subCommands: str
 			'eval', 'exec', 'source', 'sudo', 'su', 'doas',
 			// Network tools that can download and execute code
 			'curl', 'wget', 'invoke-restmethod', 'invoke-webrequest', 'irm', 'iwr',
+			// Remote access tools that can execute arbitrary commands on remote hosts
+			'ssh', 'scp', 'sftp', 'rsync',
 		]);
 
 		// Commands where we want to suggest the sub-command (eg. `foo bar` instead of `foo`)

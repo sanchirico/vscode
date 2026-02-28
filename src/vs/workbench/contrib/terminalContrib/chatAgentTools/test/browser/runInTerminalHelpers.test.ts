@@ -463,6 +463,34 @@ suite('generateAutoApproveActions', () => {
 		const subCommandAction = actions.find(action => action.label.includes('mvn -DskipIT test') && action.label.includes('Always Allow Command:'));
 		strictEqual(subCommandAction, undefined, 'Should not suggest approval for already approved commands');
 	});
+
+	for (const cmd of ['ssh', 'scp', 'sftp', 'rsync']) {
+		test(`should not suggest command approval for ${cmd}`, () => {
+			const commandLine = `${cmd} user@host`;
+			const subCommands = [`${cmd} user@host`];
+			const autoApproveResult = {
+				subCommandResults: [createMockResult('noMatch', 'not approved')],
+				commandLineResult: createMockResult('noMatch', 'not approved')
+			};
+
+			const actions = generateAutoApproveActions(commandLine, subCommands, autoApproveResult);
+			const subCommandAction = actions.find(action => action.label.includes('Always Allow Command:'));
+			strictEqual(subCommandAction, undefined, `Should not suggest command approval for ${cmd}`);
+		});
+
+		test(`should still suggest exact command line approval for ${cmd}`, () => {
+			const commandLine = `${cmd} user@host`;
+			const subCommands = [`${cmd} user@host`];
+			const autoApproveResult = {
+				subCommandResults: [createMockResult('noMatch', 'not approved')],
+				commandLineResult: createMockResult('noMatch', 'not approved')
+			};
+
+			const actions = generateAutoApproveActions(commandLine, subCommands, autoApproveResult);
+			const exactCommandAction = actions.find(action => action.label.includes('Always Allow Exact Command Line'));
+			ok(exactCommandAction, `Should still suggest exact command line approval for ${cmd}`);
+		});
+	}
 });
 
 suite('extractCdPrefix', () => {
