@@ -1177,6 +1177,7 @@ suite('PromptsService', () => {
 			);
 		});
 
+
 		test('agents with .md extension should be recognized, except README.md', async () => {
 			const rootFolderName = 'custom-agents-md-extension';
 			const rootFolder = `/${rootFolderName}`;
